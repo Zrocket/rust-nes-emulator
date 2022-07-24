@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use bitflags::bitflags;
 use super::opcodes;
 use super::Bus;
+use super::Rom;
 
 bitflags! {
     pub struct CpuFlags: u8 {
@@ -82,7 +83,7 @@ impl Mem for CPU {
 }
 
 impl CPU {
-    pub fn new() -> Self {
+    pub fn new(cart_rom: Rom) -> Self {
         CPU {
             register_a: 0,
             register_x: 0,
@@ -90,7 +91,7 @@ impl CPU {
             status: CpuFlags::from_bits_truncate(0b100100),
             program_counter: 0,
             stack_pointer: STACK_RESET,
-            bus: Bus::new(),
+            bus: Bus::new(cart_rom),
         }
     }
 
@@ -184,8 +185,10 @@ impl CPU {
     }
 
     pub fn load(&mut self, program: Vec<u8>) {
-        self.memory[0x0600 .. (0x0600 + program.len())].copy_from_slice(&program[..]);
-        self.mem_write_u16(0xFFFC, 0x0600);
+        for i in 0..(program.len() as u16) {
+            self.mem_write(0x0600 + i, program[i as usize]);
+        }
+        //self.mem_write_u16(0xFFFC, 0x0600);
     }
 
     pub fn run(&mut self) {
