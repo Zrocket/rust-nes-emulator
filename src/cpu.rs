@@ -83,7 +83,7 @@ impl Mem for CPU {
 }
 
 impl CPU {
-    pub fn new(cart_rom: Rom) -> Self {
+    pub fn new(bus: Bus) -> Self {
         CPU {
             register_a: 0,
             register_x: 0,
@@ -91,7 +91,7 @@ impl CPU {
             status: CpuFlags::from_bits_truncate(0b100100),
             program_counter: 0,
             stack_pointer: STACK_RESET,
-            bus: Bus::new(cart_rom),
+            bus,
         }
     }
 
@@ -178,13 +178,13 @@ impl CPU {
     }
 
 
-    pub fn load_and_run(&mut self, program: Vec<u8>) {
+    pub fn load_and_run(&mut self, program: &Vec<u8>) {
         self.load(program);
         self.reset();
         self.run();
     }
 
-    pub fn load(&mut self, program: Vec<u8>) {
+    pub fn load(&mut self, program: &Vec<u8>) {
         for i in 0..(program.len() as u16) {
             self.mem_write(0x0600 + i, program[i as usize]);
         }
@@ -211,12 +211,6 @@ impl CPU {
             let opcode = opcodes.get(&code).expect(&format!("OpCode {:x} is not recognized", code));
 
             let val = self.mem_read((STACK as u16) + self.stack_pointer as u16);
-            println!("a: {:x}", self.register_a);
-            println!("x: {:x}", self.register_x);
-            println!("y: {:x}", self.register_y);
-            println!("pc: {:x}", self.program_counter);
-            println!("sp: {:x}", val);
-            println!("{:x}", code);
 
             match code {
                 /* ADC */
