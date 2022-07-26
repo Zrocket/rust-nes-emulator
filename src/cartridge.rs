@@ -1,4 +1,4 @@
-const NES_TAG: [u8; 4] = [0x4e, 0x45, 0x53, 0x1a];
+pub const NES_TAG: [u8; 4] = [0x4e, 0x45, 0x53, 0x1a];
 const PRG_ROM_PAGE_SIZE: usize = 16384;
 const CHR_ROM_PAGE_SIZE: usize = 8192;
 
