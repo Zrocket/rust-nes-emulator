@@ -11,11 +11,13 @@ pub mod opcodes;
 pub mod cpu;
 pub mod bus;
 pub mod cartridge;
+pub mod trace;
 
 pub use opcodes::*;
 pub use cpu::*;
 pub use bus::*;
 pub use cartridge::*;
+pub use trace::*;
 
 fn handle_user_input(cpu: &mut CPU, event_pump: &mut EventPump) {
     for event in event_pump.poll_iter() {
@@ -71,10 +73,6 @@ fn read_screen_state(cpu: &CPU, frame: &mut [u8; 32 * 3 * 32]) -> bool {
     update
 }
 
-fn test_rom() -> Rom {
-    let game_file = fs::read(&"nestest.nes").expect("Cannot open test rom file");
-    Rom::new(&game_file).unwrap()
-}
 
 
 fn main() {

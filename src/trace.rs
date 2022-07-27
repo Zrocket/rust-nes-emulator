@@ -1,38 +1,52 @@
 use std::collections::HashMap;
+use std::fs;
+
+use super::{CPU, Mem, AddressingMode, opcodes, Rom, Bus};
 
 fn trace(cpu: &mut CPU) -> String {
-    let mut line = String::new();
-    line += &cpu.program_counter.to_string();
-
-    line += &"\t".to_string();
     let ref opcodes: HashMap<u8, &'static opcodes::OpCode> = *opcodes::OPCODES_MAP;
     let code = cpu.mem_read(cpu.program_counter);
     let opcode = opcodes.get(&code).expect(&format!("OpCode {:x} is not recognized", code));
-    for i in 0..opcode.len {
-        line += &cpu.mem_read(cpu.program_counter + i as u16).to_string();
-        line += &" ".to_string();
+
+    let asm_line = format!("{:02X} {:02X}",
+                      cpu.mem_read(cpu.program_counter),
+                      cpu.mem_read(cpu.program_counter + 1),
+                      );
+
+    match &opcode.mode {
+        Immediate => {}
+        ZeroPage => {}
+        ZeroPage_x => {}
+        ZeroPage_Y => {}
+        Absolute => {}
+        Absolute_X => {}
+        Absolute_Y => {}
+        Indirect_X => {}
+        Indirect_Y => {}
+        NoneAddressing=> {}
     }
 
-    line += &"\t".to_string();
-    line += &opcode.menomic.to_string();
+    let op_line = format!("{}",
+                          opcode.menomic,
+                          );
 
-    line += &"\t".to_string();
-    line += &"A:".to_string();
-    line += &cpu.register_a.to_string();
-    line += &" ".to_string();
-    line += &"X:".to_string();
-    line += &cpu.register_x.to_string();
-    line += &" ".to_string();
-    line += &"Y:".to_string();
-    line += &cpu.register_y.to_string();
-    line += &" ".to_string();
-    line += &"P:".to_string();
-    line += &(cpu.status.bits() as u8).to_string();
-    line += &" ".to_string();
-    line += &"SP:".to_string();
-    line += &cpu.stack_pointer.to_string();
+    let line = format!("{:04X}  {}   {} A:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X}",
+                           cpu.program_counter,
+                           asm_line,
+                           op_line,
+                           cpu.register_a,
+                           cpu.register_x,
+                           cpu.register_y,
+                           cpu.status.bits(),
+                           cpu.stack_pointer,
+                           );
 
     line
+}
+
+fn test_rom() -> Rom {
+    let game_file = fs::read(&"nestest.nes").expect("Cannot open test rom file");
+    Rom::new(&game_file).unwrap()
 }
 
 #[cfg(test)]
@@ -58,15 +72,15 @@ mod test {
             result.push(trace(cpu));
         });
         assert_eq!(
-            "0064   A2 01 -- -- LDX #$01    A:01 X:01 Y:03 P:24 SP:FD",
+            "0064  A2 01     LDX #$01                        A:01 X:02 Y:03 P:24 SP:FD",
             result[0]
         );
         assert_eq!(
-            "0066   CA -- -- -- DEX     A:01 X:01 Y:03 P:24 SP:FD",
+            "0066  CA        DEX                             A:01 X:01 Y:03 P:24 SP:FD",
             result[1]
         );
         assert_eq!(
-            "0067   88 -- -- -- DEY A:01 X:00 Y:03 P:26 SP:FD",
+            "0067  88        DEY                             A:01 X:00 Y:03 P:26 SP:FD",
             result[2]
         );
     }
@@ -93,7 +107,7 @@ mod test {
            result.push(trace(cpu));
        });
        assert_eq!(
-           "0064    11 33 -- -- ORA ($33), Y = 0400 @ 0400 = AA A:00 X:00 Y:00 P:24 SP:FD",
+           "0064  11 33     ORA ($33),Y = 0400 @ 0400 = AA  A:00 X:00 Y:00 P:24 SP:FD",
            result[0]
        );
     }
