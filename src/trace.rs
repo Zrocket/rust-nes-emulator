@@ -3,34 +3,80 @@ use std::fs;
 
 use super::{CPU, Mem, AddressingMode, opcodes, Rom, Bus};
 
-fn trace(cpu: &mut CPU) -> String {
+pub fn trace(cpu: &mut CPU) -> String {
     let ref opcodes: HashMap<u8, &'static opcodes::OpCode> = *opcodes::OPCODES_MAP;
     let code = cpu.mem_read(cpu.program_counter);
     let opcode = opcodes.get(&code).expect(&format!("OpCode {:x} is not recognized", code));
 
-    let asm_line = format!("{:02X} {:02X}",
-                      cpu.mem_read(cpu.program_counter),
-                      cpu.mem_read(cpu.program_counter + 1),
-                      );
-
-    match &opcode.mode {
-        Immediate => {}
-        ZeroPage => {}
-        ZeroPage_x => {}
-        ZeroPage_Y => {}
-        Absolute => {}
-        Absolute_X => {}
-        Absolute_Y => {}
-        Indirect_X => {}
-        Indirect_Y => {}
-        NoneAddressing=> {}
+    let mut asm_line: String = "".to_string();
+    for i in 0..opcode.len {
+        asm_line.push_str(&format!("{:02X} ", cpu.mem_read(cpu.program_counter + i as u16)));
     }
 
-    let op_line = format!("{}",
+    let mut op_line = format!("{} ",
                           opcode.menomic,
                           );
+    match &opcode.mode {
+        AddressingMode::Immediate => {
+            op_line.push_str(&format!("#${:02X}", cpu.mem_read_u16(cpu.program_counter + 1)));
+        }
+        AddressingMode::ZeroPage => {
+            op_line.push_str(&format!("${:02X}", cpu.mem_read(cpu.program_counter + 1)));
+        }
+        AddressingMode::ZeroPage_x => {
+            op_line.push_str(&format!("${:02X},X", cpu.mem_read(cpu.program_counter + 1)));
+        }
+        AddressingMode::ZeroPage_Y => {
+            op_line.push_str(&format!("${:02X},Y", cpu.mem_read(cpu.program_counter + 1)));
+        }
+        AddressingMode::Absolute => {
+            let lo = cpu.mem_read(cpu.program_counter + 1);
+            let hi = cpu.mem_read(cpu.program_counter + 2);
+            let deref_base = (hi as u16) << 8 | (lo as u16);
+            op_line.push_str(&format!("${:04X}", deref_base));
+        }
+        AddressingMode::Absolute_X => {
+            op_line.push_str(&format!("${:03X},X", cpu.mem_read(cpu.program_counter + 1)));
+        }
+        AddressingMode::Absolute_Y => {
+            op_line.push_str(&format!("${:03X},Y", cpu.mem_read(cpu.program_counter + 1)));
+        }
+        AddressingMode::Indirect_X => {
+            let base = cpu.mem_read(cpu.program_counter + 1);
 
-    let line = format!("{:04X}  {}   {} A:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X}",
+            let lo = cpu.mem_read(base as u16);
+            let hi = cpu.mem_read((base as u8).wrapping_add(1) as u16);
+            let deref_base = (hi as u16) << 8 | (lo as u16);
+            let deref = deref_base.wrapping_add(cpu.register_x as u16);
+            let real_value = cpu.mem_read(deref);
+            op_line.push_str(&format!("(${:02X},X) @ {:02X} = {} = {}",
+            base,
+            deref_base,
+            deref,
+            real_value));
+        }
+        AddressingMode::Indirect_Y => {
+            let base = cpu.mem_read(cpu.program_counter + 1);
+
+            let lo = cpu.mem_read(base as u16);
+            let hi = cpu.mem_read((base as u8).wrapping_add(1) as u16);
+            let deref_base = (hi as u16) << 8 | (lo as u16);
+            let deref = deref_base.wrapping_add(cpu.register_y as u16);
+            let real_value = cpu.mem_read(deref);
+            
+            op_line.push_str(&format!("(${:02X}),Y = {:04X} @ {:04X} = {:2X}",
+            base,
+            deref_base,
+            deref,
+            real_value));
+        }
+        AddressingMode::NoneAddressing => {
+            op_line.push_str(&format!(""));
+        }
+    }
+
+
+    let line = format!("{:04X}  {:09} {:31} A:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X}",
                            cpu.program_counter,
                            asm_line,
                            op_line,

@@ -76,10 +76,6 @@ fn read_screen_state(cpu: &CPU, frame: &mut [u8; 32 * 3 * 32]) -> bool {
 
 
 fn main() {
-    /*
-    let args: Vec<String> = env::args().collect();
-    let filename = &args[1];
-
     // int sdl2
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
@@ -96,12 +92,13 @@ fn main() {
     let mut texture = creator
         .create_texture_target(PixelFormatEnum::RGB24, 32, 32).unwrap();
 
-    let game_rom = read_rom(&filename).unwrap();
-
     // Load the game
-    let mut cpu = CPU::new(game_rom);
-    cpu.load(&game_rom.prg_rom);
+    let bytes: Vec<u8> = std::fs::read("nestest.nes").unwrap();
+    let rom = Rom::new(&bytes).unwrap();
+    let bus = Bus::new(rom);
+    let mut cpu = CPU::new(bus);
     cpu.reset();
+    cpu.program_counter = 0xC000;
 
     let mut screen_state = [0 as u8; 32 * 3 * 32];
     let mut rng = rand::thread_rng();
@@ -109,5 +106,4 @@ fn main() {
     cpu.run_with_callback(move |cpu| {
         println!("{}", trace(cpu));
     });
-    */
 }

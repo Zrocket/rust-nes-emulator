@@ -423,13 +423,23 @@ impl CPU {
                     self.ora(&opcode.mode);
                 }
 
+                /* ROR Accumulaor */
+                0x6a => {
+                    self.ror_accumulator();
+                }
+
                 /* ROR */
-                0x6a | 0x66 | 0x76 | 0x6e | 0x7e => {
+                0x66 | 0x76 | 0x6e | 0x7e => {
                     self.ror(&opcode.mode);
                 }
 
+                /* ROL Accumulaor */
+                0x2a => {
+                    self.rol_accumulator();
+                }
+
                 /* ROL */
-                0x2a | 0x26 | 0x36 | 0x2e | 0x3e => {
+                0x26 | 0x36 | 0x2e | 0x3e => {
                     self.rol(&opcode.mode);
                 }
 
@@ -562,6 +572,22 @@ impl CPU {
         }
     }
 
+    fn ror_accumulator(&mut self) {
+        let mut data = self.register_a;
+        let old_carry = self.status.contains(CpuFlags::CARRY);
+
+        if data & 1 == 1 {
+            self.status.insert(CpuFlags::CARRY);
+        } else {
+            self.status.remove(CpuFlags::CARRY);
+        }
+        data = data >> 1;
+        if old_carry {
+            data = data | 0b10000000;
+        }
+        self.set_register_a(data);
+    }
+
     fn rol(&mut self, mode: &AddressingMode) {
         let addr = self.get_operand_address(mode);
         let mut data = self.mem_read(addr);
@@ -589,6 +615,22 @@ impl CPU {
                 self.update_zero_and_negative_flags(data);
             }
         }
+    }
+
+    fn rol_accumulator(&mut self) {
+        let mut data = self.register_a;
+        let old_carry = self.status.contains(CpuFlags::CARRY);
+
+        if data >> 7 == 1 {
+            self.status.insert(CpuFlags::CARRY);
+        } else {
+            self.status.remove(CpuFlags::CARRY);
+        }
+        data = data << 1;
+        if old_carry {
+            data = data | 1;
+        }
+        self.set_register_a(data);
     }
 
     fn ldy(&mut self, mode: &AddressingMode) {

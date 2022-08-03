@@ -288,7 +288,7 @@ lazy_static!{
         /* STY */
         OpCode::new(0x84, "STY", 2, 3, AddressingMode::ZeroPage),
         OpCode::new(0x96, "STY", 2, 4, AddressingMode::ZeroPage_Y),
-        OpCode::new(0x8e, "STY", 3, 4, AddressingMode::Absolute),
+        OpCode::new(0x8c, "STY", 3, 4, AddressingMode::Absolute),
 
     ];
 
