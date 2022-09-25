@@ -71,7 +71,7 @@ lazy_static!{
         OpCode::new(0x90, "BCC", 2, 2, AddressingMode::NoneAddressing),
 
         /* BCS */
-        OpCode::new(0xb0, "BCC", 2, 2, AddressingMode::NoneAddressing),
+        OpCode::new(0xb0, "BCS", 2, 2, AddressingMode::NoneAddressing),
 
         /* BNE */
         OpCode::new(0xd0, "BNE", 2, 2, AddressingMode::NoneAddressing),

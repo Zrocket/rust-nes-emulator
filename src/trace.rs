@@ -13,67 +13,125 @@ pub fn trace(cpu: &mut CPU) -> String {
         asm_line.push_str(&format!("{:02X} ", cpu.mem_read(cpu.program_counter + i as u16)));
     }
 
-    let mut op_line = format!("{} ",
-                          opcode.menomic,
-                          );
-    match &opcode.mode {
-        AddressingMode::Immediate => {
-            op_line.push_str(&format!("#${:02X}", cpu.mem_read_u16(cpu.program_counter + 1)));
-        }
-        AddressingMode::ZeroPage => {
-            op_line.push_str(&format!("${:02X}", cpu.mem_read(cpu.program_counter + 1)));
-        }
-        AddressingMode::ZeroPage_x => {
-            op_line.push_str(&format!("${:02X},X", cpu.mem_read(cpu.program_counter + 1)));
-        }
-        AddressingMode::ZeroPage_Y => {
-            op_line.push_str(&format!("${:02X},Y", cpu.mem_read(cpu.program_counter + 1)));
-        }
-        AddressingMode::Absolute => {
-            let lo = cpu.mem_read(cpu.program_counter + 1);
-            let hi = cpu.mem_read(cpu.program_counter + 2);
-            let deref_base = (hi as u16) << 8 | (lo as u16);
-            op_line.push_str(&format!("${:04X}", deref_base));
-        }
-        AddressingMode::Absolute_X => {
-            op_line.push_str(&format!("${:03X},X", cpu.mem_read(cpu.program_counter + 1)));
-        }
-        AddressingMode::Absolute_Y => {
-            op_line.push_str(&format!("${:03X},Y", cpu.mem_read(cpu.program_counter + 1)));
-        }
-        AddressingMode::Indirect_X => {
-            let base = cpu.mem_read(cpu.program_counter + 1);
+    let op_line = match &opcode.mode {
+            AddressingMode::Immediate => {
+                format!("{} #${:02X}",
+                        opcode.menomic,
+                        cpu.mem_read(cpu.program_counter + 1))
+            }
+            AddressingMode::ZeroPage => {
+                format!("{} ${:02X} = {:02X}",
+                        opcode.menomic,
+                        cpu.mem_read(cpu.program_counter + 1),
+                        cpu.mem_read(cpu.mem_read(cpu.program_counter + 1) as u16))
+            }
+            AddressingMode::ZeroPage_x => {
+                format!("{} ${:02X},X",
+                        opcode.menomic,
+                        cpu.mem_read(cpu.program_counter + 1))
+            }
+            AddressingMode::ZeroPage_Y => {
+                if opcode.len == 2 {
+                    format!("{} ${:02X},Y",
+                            opcode.menomic,
+                            cpu.mem_read(cpu.program_counter + 1))
+                } else {
+                    let lo = cpu.mem_read(cpu.program_counter + 1);
+                    let hi = cpu.mem_read(cpu.program_counter + 2);
+                    let deref_base = (hi as u16) << 8 | (lo as u16);
 
-            let lo = cpu.mem_read(base as u16);
-            let hi = cpu.mem_read((base as u8).wrapping_add(1) as u16);
-            let deref_base = (hi as u16) << 8 | (lo as u16);
-            let deref = deref_base.wrapping_add(cpu.register_x as u16);
-            let real_value = cpu.mem_read(deref);
-            op_line.push_str(&format!("(${:02X},X) @ {:02X} = {} = {}",
-            base,
-            deref_base,
-            deref,
-            real_value));
-        }
-        AddressingMode::Indirect_Y => {
-            let base = cpu.mem_read(cpu.program_counter + 1);
+                    format!("{} ${:04X} = {:02X}",
+                            opcode.menomic,
+                            deref_base,
+                            cpu.mem_read(deref_base))
+                }
+            }
+            AddressingMode::Absolute => {
+                let lo = cpu.mem_read(cpu.program_counter + 1);
+                let hi = cpu.mem_read(cpu.program_counter + 2);
+                let deref_base = (hi as u16) << 8 | (lo as u16);
 
-            let lo = cpu.mem_read(base as u16);
-            let hi = cpu.mem_read((base as u8).wrapping_add(1) as u16);
-            let deref_base = (hi as u16) << 8 | (lo as u16);
-            let deref = deref_base.wrapping_add(cpu.register_y as u16);
-            let real_value = cpu.mem_read(deref);
-            
-            op_line.push_str(&format!("(${:02X}),Y = {:04X} @ {:04X} = {:2X}",
-            base,
-            deref_base,
-            deref,
-            real_value));
-        }
-        AddressingMode::NoneAddressing => {
-            op_line.push_str(&format!(""));
-        }
-    }
+                if opcode.menomic == "JMP" {
+                    format!("{} ${:04X}",
+                            opcode.menomic,
+                            deref_base)
+                } else {
+                    format!("{} ${:04X} = {:02X}",
+                            opcode.menomic,
+                            deref_base,
+                            cpu.mem_read(deref_base))
+                }
+
+            }
+            AddressingMode::Absolute_X => {
+                format!("{} ${:03X},X",
+                        opcode.menomic,
+                        cpu.mem_read(cpu.program_counter + 1))
+            }
+            AddressingMode::Absolute_Y => {
+                format!("{} ${:03X},Y",
+                        opcode.menomic,
+                        cpu.mem_read(cpu.program_counter + 1))
+            }
+            AddressingMode::Indirect_X => {
+                let base = cpu.mem_read(cpu.program_counter + 1);
+                let indirect_base = base.wrapping_add(cpu.register_x);
+                let lo = cpu.mem_read(indirect_base as u16);
+                let hi = cpu.mem_read((indirect_base as u8).wrapping_add(1) as u16);
+                let deref_base = (hi as u16) << 8 | (lo as u16);
+                let real_value = cpu.mem_read(deref_base);
+
+                format!("{} (${:02X},X) @ {:02X} = {:04X} = {:02X}",
+                opcode.menomic,
+                base,
+                indirect_base,
+                deref_base,
+                real_value)
+            }
+            AddressingMode::Indirect_Y => {
+                let base = cpu.mem_read(cpu.program_counter + 1);
+                let lo = cpu.mem_read(base as u16);
+                let hi = cpu.mem_read((base as u8).wrapping_add(1) as u16);
+                let deref_base = (hi as u16) << 8 | (lo as u16);
+                let deref = deref_base.wrapping_add(cpu.register_y as u16);
+                let real_value = cpu.mem_read(deref);
+                
+                format!("{} (${:02X}),Y = {:04X} @ {:04X} = {:2X}",
+                opcode.menomic,
+                base,
+                deref_base,
+                deref,
+                real_value)
+            }
+            AddressingMode::NoneAddressing => {
+                match &opcode.len {
+                    1 => {
+                        if &opcode.menomic == &"LSR" || &opcode.menomic == &"ASL" || &opcode.menomic == &"ROL" || &opcode.menomic == &"ROR" {
+                            format!("{} A",
+                                    opcode.menomic)
+                        } else {
+                            format!("{}",
+                                    opcode.menomic)
+                        }
+                    }
+                    2 => {
+                        let offset = cpu.mem_read(cpu.program_counter + 1) as u16;
+                        let val = cpu.program_counter + opcode.len as u16 + offset;
+                        format!("{} ${:04X}",
+                                opcode.menomic,
+                                val)
+                    }
+                    _ => {
+                        let lo = cpu.mem_read(cpu.program_counter + 1);
+                        let hi = cpu.mem_read(cpu.program_counter + 2);
+                        let val = (hi as u16) << 8 | (lo as u16);
+                        format!("{} ${:04X}",
+                                opcode.menomic,
+                                val,)
+                    }
+                }
+            }
+        };
 
 
     let line = format!("{:04X}  {:09} {:31} A:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X}",

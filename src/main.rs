@@ -77,7 +77,7 @@ fn read_screen_state(cpu: &CPU, frame: &mut [u8; 32 * 3 * 32]) -> bool {
 
 fn main() {
     // int sdl2
-    let sdl_context = sdl2::init().unwrap();
+/*    let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
     let window = video_subsystem
         .window("Snake game", (32.0 * 10.0) as u32, (32.0 * 10.0) as u32)
@@ -91,6 +91,7 @@ fn main() {
     let creator = canvas.texture_creator();
     let mut texture = creator
         .create_texture_target(PixelFormatEnum::RGB24, 32, 32).unwrap();
+        */
 
     // Load the game
     let bytes: Vec<u8> = std::fs::read("nestest.nes").unwrap();

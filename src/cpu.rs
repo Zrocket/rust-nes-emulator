@@ -481,16 +481,17 @@ impl CPU {
 
                 /* PHP */
                 0x08 => {
-                    self.stack_push(self.status.bits());
-                    self.status.insert(CpuFlags::BREAK);
-                    self.status.insert(CpuFlags::UNUSED);
+                    let mut flags = self.status.clone();
+                    flags.insert(CpuFlags::BREAK);
+                    flags.insert(CpuFlags::UNUSED);
+                    self.stack_push(flags.bits());
                 }
 
                 /* PLP */
                 0x28 => {
                     self.status.bits = self.stack_pop();
                     self.status.remove(CpuFlags::BREAK);
-                    self.status.remove(CpuFlags::UNUSED);
+                    self.status.insert(CpuFlags::UNUSED);
                 }
 
                 /* TAX */
@@ -532,7 +533,6 @@ impl CPU {
         let value = self.mem_read(addr);
 
         self.set_register_a(value);
-        self.update_zero_and_negative_flags(self.register_a);
     }
 
     fn ldx(&mut self, mode: &AddressingMode) {
@@ -724,6 +724,7 @@ impl CPU {
         } else {
             self.register_x += 1;
         }
+        self.update_zero_and_negative_flags(self.register_x);
     }
 
     fn iny(&mut self) {
@@ -732,6 +733,7 @@ impl CPU {
         } else {
             self.register_y += 1;
         }
+        self.update_zero_and_negative_flags(self.register_y);
     }
 
     fn dec(&mut self, mode: &AddressingMode) {
@@ -760,10 +762,11 @@ impl CPU {
         } else {
             self.register_y -= 1;
         }
+        self.update_zero_and_negative_flags(self.register_y);
     }
 
     fn asl(&mut self, mode: &AddressingMode) {
-        if self.register_a & 0b1000000 > 0 {
+        if self.register_a & 0b10000000 > 0 {
             self.status.insert(CpuFlags::CARRY);
         } else {
             self.status.remove(CpuFlags::CARRY);
@@ -774,14 +777,31 @@ impl CPU {
     }
     
     fn lsr(&mut self, mode: &AddressingMode) {
-        if self.register_a & 0b0000001 > 0 {
-            self.status.insert(CpuFlags::CARRY);
-        } else {
-            self.status.remove(CpuFlags::CARRY);
+        match mode {
+            AddressingMode::NoneAddressing => {
+                if self.register_a & 0b00000001 > 0 {
+                    self.status.insert(CpuFlags::CARRY);
+                } else {
+                    self.status.remove(CpuFlags::CARRY);
+                }
+
+                self.set_register_a(self.register_a >> 1);
+            }
+            _ => {
+                let addr = self.get_operand_address(mode);
+                let mut value = self.mem_read(addr);
+
+                if value & 0b00000001 > 0 {
+                    self.status.insert(CpuFlags::CARRY);
+                } else {
+                    self.status.remove(CpuFlags::CARRY);
+                }
+
+                value = value >> 1;
+                self.mem_write(addr, value);
+                self.update_zero_and_negative_flags(value);
+            }
         }
-
-        self.set_register_a(self.register_a >> 1);
-
     }
 
     fn and(&mut self, mode:  &AddressingMode) {
@@ -842,8 +862,8 @@ impl CPU {
             self.status.remove(CpuFlags::ZERO);
         }
 
-        self.status.set(CpuFlags::NEGATIVE, value & 0b1000000 > 0);
-        self.status.set(CpuFlags::OVERFLOW, value & 0b0100000 > 0);
+        self.status.set(CpuFlags::NEGATIVE, value & 0b10000000 > 0);
+        self.status.set(CpuFlags::OVERFLOW, value & 0b01000000 > 0);
     }
 
     fn tax(&mut self) {
@@ -856,12 +876,12 @@ impl CPU {
     }
 
     fn tay(&mut self) {
-        self.set_register_a(self.register_y);
+        self.register_y = self.register_a;
+        self.update_zero_and_negative_flags(self.register_y);
     }
 
     fn tya(&mut self) {
-        self.register_y = self.register_a;
-        self.update_zero_and_negative_flags(self.register_y);
+        self.set_register_a(self.register_y);
     }
 
     fn clc(&mut self) {
