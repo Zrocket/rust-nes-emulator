@@ -20,31 +20,31 @@ pub fn trace(cpu: &mut CPU) -> String {
                         cpu.mem_read(cpu.program_counter + 1))
             }
             AddressingMode::ZeroPage => {
+                let value: u16 = cpu.mem_read(cpu.program_counter + 1) as u16;
                 format!("{} ${:02X} = {:02X}",
                         opcode.menomic,
                         cpu.mem_read(cpu.program_counter + 1),
-                        cpu.mem_read(cpu.mem_read(cpu.program_counter + 1) as u16))
+                        cpu.mem_read(value))
             }
             AddressingMode::ZeroPage_x => {
-                format!("{} ${:02X},X",
+                let operand = cpu.mem_read(cpu.program_counter + 1);
+                let val = cpu.register_x.wrapping_add(operand);
+                let deref = cpu.mem_read(val as u16);
+                format!("{} ${:02X},X @ {:02X} = {:02X}",
                         opcode.menomic,
-                        cpu.mem_read(cpu.program_counter + 1))
+                        operand,
+                        val,
+                        deref)
             }
             AddressingMode::ZeroPage_Y => {
-                if opcode.len == 2 {
-                    format!("{} ${:02X},Y",
-                            opcode.menomic,
-                            cpu.mem_read(cpu.program_counter + 1))
-                } else {
-                    let lo = cpu.mem_read(cpu.program_counter + 1);
-                    let hi = cpu.mem_read(cpu.program_counter + 2);
-                    let deref_base = (hi as u16) << 8 | (lo as u16);
+                let lo = cpu.mem_read(cpu.program_counter + 1);
+                let deref_base = cpu.register_y.wrapping_add(lo);
 
-                    format!("{} ${:04X} = {:02X}",
-                            opcode.menomic,
-                            deref_base,
-                            cpu.mem_read(deref_base))
-                }
+                format!("{} ${:02X},Y @ {:02X} = {:02X}",
+                        opcode.menomic,
+                        lo,
+                        deref_base,
+                        cpu.mem_read(deref_base as u16))
             }
             AddressingMode::Absolute => {
                 let lo = cpu.mem_read(cpu.program_counter + 1);
@@ -64,14 +64,26 @@ pub fn trace(cpu: &mut CPU) -> String {
 
             }
             AddressingMode::Absolute_X => {
-                format!("{} ${:03X},X",
+                let lo = cpu.mem_read(cpu.program_counter + 1);
+                let hi = cpu.mem_read(cpu.program_counter + 2);
+                let addr = (hi as u16) << 8 | (lo as u16);
+                let deref = addr.wrapping_add(cpu.register_x as u16);
+                format!("{} ${:04X},X @ {:04X} = {:02X}",
                         opcode.menomic,
-                        cpu.mem_read(cpu.program_counter + 1))
+                        addr,
+                        deref,
+                        cpu.mem_read(deref))
             }
             AddressingMode::Absolute_Y => {
-                format!("{} ${:03X},Y",
+                let lo = cpu.mem_read(cpu.program_counter + 1);
+                let hi = cpu.mem_read(cpu.program_counter + 2);
+                let val = (hi as u16) << 8 | (lo as u16);
+                let deref = val.wrapping_add(cpu.register_y as u16);
+                format!("{} ${:04X},Y @ {:04X} = {:02X}",
                         opcode.menomic,
-                        cpu.mem_read(cpu.program_counter + 1))
+                        val,
+                        deref,
+                        cpu.mem_read(deref))
             }
             AddressingMode::Indirect_X => {
                 let base = cpu.mem_read(cpu.program_counter + 1);
@@ -96,12 +108,21 @@ pub fn trace(cpu: &mut CPU) -> String {
                 let deref = deref_base.wrapping_add(cpu.register_y as u16);
                 let real_value = cpu.mem_read(deref);
                 
-                format!("{} (${:02X}),Y = {:04X} @ {:04X} = {:2X}",
+                format!("{} (${:02X}),Y = {:04X} @ {:04X} = {:02X}",
                 opcode.menomic,
                 base,
                 deref_base,
                 deref,
                 real_value)
+            }
+            AddressingMode::Relative => {
+                let jump: i8 = cpu.mem_read(cpu.program_counter + 1) as i8;
+                let jump_addr = cpu.program_counter
+                    .wrapping_add(1)
+                    .wrapping_add(jump as u16);
+                format!("{} ${:04X}",
+                        opcode.menomic,
+                        jump_addr + 1)
             }
             AddressingMode::NoneAddressing => {
                 match &opcode.len {
@@ -131,21 +152,53 @@ pub fn trace(cpu: &mut CPU) -> String {
                     }
                 }
             }
+            AddressingMode::Absolute_Indirect => {
+                let addr = cpu.mem_read_u16(cpu.program_counter + 1);
+
+                let target = if addr & 0x00ff == 0x00ff {
+                    let lo = cpu.mem_read(addr);
+                    let hi = cpu.mem_read(addr & 0xff00);
+                    (hi as u16) << 8 | (lo as u16)
+                } else {
+                    cpu.mem_read_u16(addr)
+                };
+                format!("{} (${:04X}) = {:04X}",
+                        opcode.menomic,
+                        addr,
+                        target)
+
+            }
         };
 
+    match opcode.wrap {
+        true => {
+            let line = format!("{:04X}  {:09}*{:31} A:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X}",
+                                   cpu.program_counter,
+                                   asm_line,
+                                   op_line,
+                                   cpu.register_a,
+                                   cpu.register_x,
+                                   cpu.register_y,
+                                   cpu.status.bits(),
+                                   cpu.stack_pointer,
+                                   );
+            line
 
-    let line = format!("{:04X}  {:09} {:31} A:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X}",
-                           cpu.program_counter,
-                           asm_line,
-                           op_line,
-                           cpu.register_a,
-                           cpu.register_x,
-                           cpu.register_y,
-                           cpu.status.bits(),
-                           cpu.stack_pointer,
-                           );
-
-    line
+        },
+        false => {
+            let line = format!("{:04X}  {:09} {:31} A:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X}",
+                                   cpu.program_counter,
+                                   asm_line,
+                                   op_line,
+                                   cpu.register_a,
+                                   cpu.register_x,
+                                   cpu.register_y,
+                                   cpu.status.bits(),
+                                   cpu.stack_pointer,
+                                   );
+            line
+        }
+    }
 }
 
 fn test_rom() -> Rom {

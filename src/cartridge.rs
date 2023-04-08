@@ -9,7 +9,14 @@ pub enum Mirroring {
     FOUR_SCREEN,
 }
 
+/// Rom object to be loaded into the cpu
+///
+/// Example
+/// ```
+/// ```
+///
 pub struct Rom {
+    /// Program rom
     pub prg_rom: Vec<u8>,
     pub chr_rom: Vec<u8>,
     pub mapper: u8,
@@ -17,6 +24,13 @@ pub struct Rom {
 }
 
 impl Rom {
+    /// Create and return a new rom object.
+    /// The rom must be provided as vector reference of raw u8 values.
+    ///
+    /// Example
+    /// ```
+    /// ```
+    ///
     pub fn new(raw: &Vec<u8>) -> Result<Rom, String> {
         if &raw[0..4] != NES_TAG {
             return Err("File is not in iNES file format".to_string());

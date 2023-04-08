@@ -5,15 +5,22 @@ use super::Bus;
 use super::Rom;
 use super::NES_TAG;
 
+
 bitflags! {
+    /// Convenient constants for common bit flags
     pub struct CpuFlags: u8 {
+        /// Carry bit
         const CARRY             = 0b00000001;
+        /// Zero bit
         const ZERO              = 0b00000010;
         const INTERRUPT_DISABLE = 0b00000100;
+        /// Decimal bit
         const DECIMAL           = 0b00001000;
         const BREAK             = 0b00010000;
         const UNUSED            = 0b00100000;
+        /// Overflow bit
         const OVERFLOW          = 0b01000000;
+        /// Negative bit
         const NEGATIVE          = 0b10000000;
     }
 }
@@ -23,30 +30,84 @@ const STACK_RESET: u8 = 0xfd;
 
 #[derive(Debug)]
 #[allow(non_camel_case_types)]
+/// The different addressing modes an OpCode can perform.
+/// Each addressing type determins the operand of the instruction.
 pub enum AddressingMode {
+    /// The value is provided as the operand
     Immediate,
+    /// Address relative to the first page of memory plus a provided byte
     ZeroPage,
+    /// Same as ZeroPage addressing, but also adds the value of the x register
     ZeroPage_x,
+    /// Same as ZeroPage addressing, but also adds the value of the y register
     ZeroPage_Y,
+    /// The value at the provided full u16 address in the operand
     Absolute,
+    /// Same as Absolute addressing, but also adds the value of the x register
     Absolute_X,
+    /// Same as Absolute addressing, but also adds the value of the y register
     Absolute_Y,
+    Absolute_Indirect,
+    /// Same as ZeroPage_x, but the value at the address is used as the final address
     Indirect_X,
+    /// Same as ZeroPage_y, but the value at the address is used as the final address
     Indirect_Y,
+    Relative,
+    /// The OpCode does not need or perform memory addressing
     NoneAddressing,
 }
 
+/// Defines required memory operations
+///
+/// Example
+/// ```
+/// ```
+///
 pub trait Mem {
-    fn mem_read(&self, addr: u16) -> u8;
+    /// Read the u8 contents of a u16 memory address
+    ///
+    /// Example
+    /// ```
+    /// let example = self.mem_read(addr);
+    /// ```
+    ///
+    fn mem_read(&mut self, addr: u16) -> u8;
 
+    /// Write u8 data to a u16 memory address
+    ///
+    /// Example
+    /// ```
+    /// self.mem_write(addr, data);
+    /// ```
+    ///
+    /// # [OPTIONAL: more explanations and code examples in case some specific
+    /// # cases have to be explained in details]
     fn mem_write(&mut self, addr: u16, data: u8);
 
-    fn mem_read_u16(& self, pos: u16) -> u16 {
+    /// Read the u16 data of a u16 memory address
+    ///
+    /// Example
+    /// ```
+    /// let example = self.mem_read_u16(addr);
+    /// ```
+    ///
+    /// # [OPTIONAL: more explanations and code examples in case some specific
+    /// # cases have to be explained in details]
+    fn mem_read_u16(&mut self, pos: u16) -> u16 {
         let lo = self.mem_read(pos) as u16;
         let hi = self.mem_read(pos + 1) as u16;
         (hi << 8) | (lo as u16)
     }
 
+    /// Write u16 data to a u16 memory address
+    ///
+    /// Example
+    /// ```
+    /// self.mem_write_u16(addr, data);
+    /// ```
+    ///
+    /// # [OPTIONAL: more explanations and code examples in case some specific
+    /// # cases have to be explained in details]
     fn mem_write_u16(&mut self, pos: u16, data: u16) {
         let hi = (data >> 8) as u8;
         let lo = (data & 0xff) as u8;
@@ -55,6 +116,18 @@ pub trait Mem {
     }
 }
 
+/// Contains all the needed components of the CPU:
+///     registers
+///     memory
+///     bus
+///     instruction decoding
+///
+/// Example
+/// ```
+/// ```
+///
+/// # [OPTIONAL: more explanations and code examples in case some specific
+/// # cases have to be explained in details]
 pub struct CPU {
     pub register_a: u8,
     pub register_x: u8,
@@ -66,7 +139,7 @@ pub struct CPU {
 }
 
 impl Mem for CPU {
-    fn mem_read(&self, addr: u16) -> u8 {
+    fn mem_read(&mut self, addr: u16) -> u8 {
         self.bus.mem_read(addr)
     }
 
@@ -74,7 +147,7 @@ impl Mem for CPU {
         self.bus.mem_write(addr, data);
     }
 
-    fn mem_read_u16(& self, pos: u16) -> u16 {
+    fn mem_read_u16(&mut self, pos: u16) -> u16 {
         self.bus.mem_read_u16(pos)
     }
 
@@ -84,6 +157,12 @@ impl Mem for CPU {
 }
 
 impl CPU {
+    /// Creates a new CPU object with default parameters
+    ///
+    /// Example
+    /// ```
+    /// ```
+    ///
     pub fn new(bus: Bus) -> Self {
         CPU {
             register_a: 0,
@@ -96,16 +175,37 @@ impl CPU {
         }
     }
 
+    /// Pops and returns the u8 value at the stack pointer address
+    ///
+    /// Example
+    /// ```
+    /// let example = self.stack_pop();
+    /// ```
+    ///
     fn stack_pop(&mut self) -> u8 {
         self.stack_pointer = self.stack_pointer.wrapping_add(1);
         self.mem_read((STACK as u16) + self.stack_pointer as u16)
     }
 
+    /// Pushes the provided u8 data to the stack pointer address
+    ///
+    /// Example
+    /// ```
+    /// self.stack_push(data);
+    /// ```
+    ///
     fn stack_push(&mut self, data: u8) {
         self.mem_write((STACK as u16) + self.stack_pointer as u16, data);
         self.stack_pointer = self.stack_pointer.wrapping_sub(1);
     }
 
+    /// Pops and returns the u16 value at the stack pointer address
+    ///
+    /// Example
+    /// ```
+    /// let example = self.stack_pop_u16();
+    /// ```
+    ///
     fn stack_pop_u16(&mut self) -> u16 {
         let lo = self.stack_pop() as u16;
         let hi = self.stack_pop() as u16;
@@ -113,6 +213,13 @@ impl CPU {
         hi << 8 | lo
     }
 
+    /// Pushes the provided u16 data to the stack pointer address
+    ///
+    /// Example
+    /// ```
+    /// self.stack_push_u16();
+    /// ```
+    ///
     fn stack_push_u16(&mut self, data: u16) {
         let hi = (data >> 8) as u8;
         let lo = (data & 0xff) as u8;
@@ -121,7 +228,15 @@ impl CPU {
         self.stack_push(lo);
     }
 
-    fn get_operand_address(&self, mode: &AddressingMode) -> u16 {
+    /// Return the operand address of the given addressing mode.
+    /// See AddressingMode enum for more details on addressing modes.
+    ///
+    /// Example
+    /// ```
+    /// let example = self.get_operand_address(mode);
+    /// ```
+    ///
+    fn get_operand_address(&mut self, mode: &AddressingMode) -> u16 {
         match mode {
             AddressingMode::Immediate => self.program_counter,
 
@@ -154,37 +269,60 @@ impl CPU {
             }
 
             AddressingMode::Indirect_X => {
+                // get the base address
                 let base = self.mem_read(self.program_counter);
 
+                // add register x to the base address
                 let ptr: u8 = (base as u8).wrapping_add(self.register_x);
+                // combine low and high bytes into a u16
                 let lo = self.mem_read(ptr as u16);
                 let hi = self.mem_read(ptr.wrapping_add(1) as u16);
+                // return resulting value
                 (hi as u16) << 8 | (lo as u16)
             }
 
             AddressingMode::Indirect_Y => {
+                // get the base address
                 let base = self.mem_read(self.program_counter);
 
+                // read the low and high bits at the base address
                 let lo = self.mem_read(base as u16);
                 let hi = self.mem_read((base as u8).wrapping_add(1) as u16);
+                // combine low and high values into the new dereferenced base address
                 let deref_base = (hi as u16) << 8 | (lo as u16);
+                // add the value at register y to the dereferenced base address
                 let deref = deref_base.wrapping_add(self.register_y as u16);
+                // return the resulting value
                 deref
             }
 
-            AddressingMode::NoneAddressing => {
+            AddressingMode::NoneAddressing | AddressingMode::Relative | AddressingMode::Absolute_Indirect => {
                 panic!("mode {:?} is not supported", mode);
             }
         }
     }
 
 
+    /// Load and run the provided program as a u8 vec reference
+    ///
+    /// Example
+    /// ```
+    /// cpu.load_and_run(program);
+    /// ```
+    ///
     pub fn load_and_run(&mut self, program: &Vec<u8>) {
         self.load(program);
         self.reset();
         self.run();
     }
 
+    /// Load the provided program as a u8 vec reference.
+    /// Does not run the program.
+    ///
+    /// Example
+    /// ```
+    /// ```
+    ///
     pub fn load(&mut self, program: &Vec<u8>) {
         for i in 0..(program.len() as u16) {
             self.mem_write(0x0600 + i, program[i as usize]);
@@ -192,6 +330,12 @@ impl CPU {
         //self.mem_write_u16(0xFFFC, 0x0600);
     }
 
+    /// Run the program, if one is loaded
+    ///
+    /// Example
+    /// ```
+    /// ```
+    ///
     pub fn run(&mut self) {
         self.run_with_callback(|_| {});
     }
@@ -200,17 +344,20 @@ impl CPU {
     where
         F: FnMut(&mut CPU),
     {
+        // get opcode mapping
         let ref opcodes: HashMap<u8, &'static opcodes::OpCode> = *opcodes::OPCODES_MAP;
 
         loop {
             callback(self);
 
+            // get next OpCode
             let code = self.mem_read(self.program_counter);
             self.program_counter += 1;
             let program_counter_state = self.program_counter;
 
             let opcode = opcodes.get(&code).expect(&format!("OpCode {:x} is not recognized", code));
 
+            // Match byte with instruction
             match code {
                 /* ADC */
                 0x6d | 0x7d | 0x79 | 0x69 | 0x65 | 0x61 | 0x75 | 0x71 => {
@@ -228,7 +375,7 @@ impl CPU {
                 }
 
                 /* BIT */
-                0x2c | 0x89 | 0x24 => {
+                0x2c /*| 0x89*/ | 0x24 => {
                     self.bit(&opcode.mode);
                 }
 
@@ -506,11 +653,160 @@ impl CPU {
                 /* TYA */
                 0x98 => self.tya(),
 
-                /* NOP */
-                0xea => {}
-
                 /* BRK */
                 0x00 => return,
+
+                /* ILLEGAL OPCODES */
+
+                /* AAC */
+                0x0b | 0x2b => {
+                    self.and(&opcode.mode);
+                    if self.status.contains(CpuFlags::NEGATIVE) {
+                        self.status.insert(CpuFlags::CARRY);
+                    }
+                },
+
+                /* AAX */
+                0x87 | 0x97 | 0x83 | 0x8f => {
+                    let addr = self.get_operand_address(&opcode.mode);
+                    let value = self.register_a & self.register_x;
+                    self.mem_write(addr, value);
+
+                    //self.update_zero_and_negative_flags(value);
+                },
+
+                /* ARR */
+                0x6b => {
+                    self.and(&opcode.mode);
+                    self.register_a = self.register_a >> 1;
+                    if self.register_a & 0b00010000 > 0 {
+                        if self.register_a & 0b00100000 > 0 {
+                            self.status.insert(CpuFlags::CARRY);
+                            self.status.remove(CpuFlags::OVERFLOW);
+                        } else {
+                            self.status.insert(CpuFlags::OVERFLOW);
+                            self.status.remove(CpuFlags::CARRY);
+                        }
+                    } else if self.register_a & 0b00100000 > 0 {
+                        self.status.insert(CpuFlags::CARRY);
+                        self.status.insert(CpuFlags::OVERFLOW);
+                    } else {
+                        self.status.remove(CpuFlags::CARRY);
+                        self.status.remove(CpuFlags::OVERFLOW);
+                    }
+
+                    self.update_zero_and_negative_flags(self.register_a);
+                },
+
+                /* ASR */
+                0x4b => {
+                    self.and(&opcode.mode);
+                    self.ror_accumulator();
+                },
+
+                /* ATX */
+                0xab => {
+                    self.and(&opcode.mode);
+                    self.register_x = self.register_a;
+                    self.update_zero_and_negative_flags(self.register_x);
+                },
+
+                /* AXA */
+                0x9f | 0x93 => {
+                    let addr = self.get_operand_address(&opcode.mode);
+                    let mut value = self.register_x & self.register_a;
+                    value = value & 7;
+                    self.mem_write(addr, value);
+                },
+
+                /* AXS */
+                0xcb => {
+                    let addr = self.get_operand_address(&opcode.mode);
+                    self.mem_write(addr, self.register_x & self.register_a);
+                },
+
+                /* DCP */
+                0xc7 | 0xd7 | 0xcf | 0xdf | 0xdb | 0xc3 | 0xd3 => {
+                    let addr = self.get_operand_address(&opcode.mode);
+                    self.dec(&opcode.mode);
+                    let value = self.mem_read(addr);
+                    self.update_zero_and_negative_flags(self.register_a.wrapping_sub(value));
+                },
+
+                /* DOP */
+                0x04 | 0x14 | 0x34 | 0x44 | 0x54 | 0x64 | 0x74 | 0x80 | 0x82 | 0x89 | 0xc2 | 0xd4 | 0xe2 | 0xf4 => {},
+
+                /* ISC */
+                0xe7 | 0xf7 | 0xef | 0xff | 0xfb | 0xe3 | 0xf3 => {
+                    self.inc(&opcode.mode);
+                    self.sbc(&opcode.mode);
+                },
+
+                /* KIL */
+                0x02 | 0x12 | 0x22 | 0x32 | 0x42 | 0x52 | 0x62 | 0x72 | 0x92 | 0xb2 | 0xd2 | 0xf2 => return,
+
+                /* LAR */
+                0xbb => {
+                },
+
+                /* LAX */
+                0xa7 | 0xb7 | 0xaf | 0xbf | 0xa3 | 0xb3 => {
+                    self.lda(&opcode.mode);
+                    self.register_x = self.register_a;
+                    self.update_zero_and_negative_flags(self.register_x);
+                },
+
+                /* NOP */
+                0xea | 0x1a | 0x3a | 0x5a | 0x7a | 0xda | 0xfa => {},
+
+                /* RLA */
+                0x27 | 0x37 | 0x2f | 0x3f | 0x3b | 0x23 | 0x33 => {
+                    self.rol(&opcode.mode);
+                    self.and(&opcode.mode);
+                },
+
+                /* RRA */
+                0x67 | 0x77 | 0x6f | 0x7f | 0x7b | 0x63 | 0x73 => {
+                    self.ror(&opcode.mode);
+                    self.adc(&opcode.mode);
+                },
+
+                /* SBC */
+                0xeb => {
+                    self.sbc(&opcode.mode);
+                },
+
+                /* SLO */
+                0x07 | 0x17 | 0x0f | 0x1f | 0x1b | 0x03 | 0x13 => {
+                    let addr = self.get_operand_address(&opcode.mode);
+                    self.asl(&opcode.mode);
+                    let value = self.mem_read(addr);
+                    self.set_register_a(self.register_a | value);
+                },
+
+                /* SRE */
+                0x47 | 0x57 | 0x4f | 0x5f | 0x5b | 0x43 | 0x53 => {
+                    let addr = self.get_operand_address(&opcode.mode);
+                    self.lsr(&opcode.mode);
+                    let value = self.mem_read(addr);
+                    self.set_register_a(self.register_a ^ value);
+                },
+
+                /* SXA */
+                0x9e => {},
+
+                /* SYA */
+                0x9c => {},
+
+                /* TOP */
+                0x0c | 0x1c | 0x3c | 0x5c | 0x7c | 0xdc | 0xfc => {},
+
+                /* XAA */
+                0x8b => {},
+
+                /* XAS */
+                0x9b => {},
+
                 _ => todo!()
             }
 
@@ -520,6 +816,12 @@ impl CPU {
         }
     }
 
+    /// Reset CPU state
+    ///
+    /// Example
+    /// ```
+    /// ```
+    ///
     pub fn reset(&mut self) {
         self.set_register_a(0);
         self.register_x = 0;
@@ -528,6 +830,12 @@ impl CPU {
         self.program_counter = self.mem_read_u16(0xFFFC);
     }
 
+    /// Load accumulator with memory
+    ///
+    /// Example
+    /// ```
+    /// ```
+    ///
     fn lda(&mut self, mode: &AddressingMode) {
         let addr = self.get_operand_address(mode);
         let value = self.mem_read(addr);
@@ -535,6 +843,12 @@ impl CPU {
         self.set_register_a(value);
     }
 
+    /// Load register x with memory
+    ///
+    /// Example
+    /// ```
+    /// ```
+    ///
     fn ldx(&mut self, mode: &AddressingMode) {
         let addr = self.get_operand_address(mode);
         let value = self.mem_read(addr);
@@ -543,6 +857,12 @@ impl CPU {
         self.update_zero_and_negative_flags(self.register_x);
     }
 
+    /// Rotate right one bit
+    ///
+    /// Example
+    /// ```
+    /// ```
+    ///
     fn ror(&mut self, mode: &AddressingMode) {
         let addr = self.get_operand_address(mode);
         let mut data = self.mem_read(addr);
@@ -558,18 +878,11 @@ impl CPU {
         data = data >> 1;
 
         if old_carry {
-            data = data & 0b10000000;
+            data = data | 0b10000000;
         }
 
-        match mode {
-            AddressingMode::Absolute => {
-                self.set_register_a(data);
-            }
-            _ => {
-                self.mem_write(addr, data);
-                self.update_zero_and_negative_flags(data);
-            }
-        }
+        self.mem_write(addr, data);
+        self.update_zero_and_negative_flags(data);
     }
 
     fn ror_accumulator(&mut self) {
@@ -588,6 +901,12 @@ impl CPU {
         self.set_register_a(data);
     }
 
+    /// Rotate left one bit
+    ///
+    /// Example
+    /// ```
+    /// ```
+    ///
     fn rol(&mut self, mode: &AddressingMode) {
         let addr = self.get_operand_address(mode);
         let mut data = self.mem_read(addr);
@@ -603,18 +922,11 @@ impl CPU {
         data = data << 1;
 
         if old_carry {
-            data = data & 0b00000001;
+            data = data | 0b00000001;
         }
 
-        match mode {
-            AddressingMode::Absolute => {
-                self.set_register_a(data);
-            }
-            _ => {
-                self.mem_write(addr, data);
-                self.update_zero_and_negative_flags(data);
-            }
-        }
+        self.mem_write(addr, data);
+        self.update_zero_and_negative_flags(data);
     }
 
     fn rol_accumulator(&mut self) {
@@ -643,7 +955,7 @@ impl CPU {
 
     fn sta(&mut self, mode: &AddressingMode) {
        let addr = self.get_operand_address(mode);
-        self.mem_write(addr, self.register_a);
+       self.mem_write(addr, self.register_a);
     }
 
     fn stx(&mut self, mode: &AddressingMode) {
@@ -666,6 +978,12 @@ impl CPU {
 
     }
 
+    /// Sets accumulator to the specified value and updates cpu flags
+    ///
+    /// Example
+    /// ```
+    /// ```
+    ///
     fn set_register_a(&mut self, value: u8) {
         self.register_a = value;
         self.update_zero_and_negative_flags(self.register_a);
@@ -707,17 +1025,35 @@ impl CPU {
         self.add_to_register_a(((value as i8).wrapping_neg().wrapping_sub(1)) as u8);
     }
 
+    /// Increments the memory value by one.
+    /// If the value is 0xff, it will overflow back into 0.
+    ///
+    /// Example
+    /// ```
+    /// ```
+    ///
     fn inc(&mut self, mode: &AddressingMode) {
         let addr = self.get_operand_address(mode);
-        let value = self.mem_read(addr);
+        let mut value = self.mem_read(addr);
 
         if value == 0xff {
-            self.mem_write(addr, 0);
+            value = 0;
+            self.mem_write(addr, value);
         } else {
-            self.mem_write(addr, value + 1);
+            value = value + 1;
+            self.mem_write(addr, value);
         }
+
+        self.update_zero_and_negative_flags(value);
     }
 
+    /// Increments the value of the x register.
+    /// If the value if 0xff, it will overflow back into 0.
+    ///
+    /// Example
+    /// ```
+    /// ```
+    ///
     fn inx(&mut self) {
         if self.register_x == 0xff {
             self.register_x = 0;
@@ -727,6 +1063,13 @@ impl CPU {
         self.update_zero_and_negative_flags(self.register_x);
     }
 
+    /// Increments the value of the y register.
+    /// If the value if 0xff, it will overflow back into 0.
+    ///
+    /// Example
+    /// ```
+    /// ```
+    ///
     fn iny(&mut self) {
         if self.register_y == 0xff {
             self.register_y = 0;
@@ -736,17 +1079,35 @@ impl CPU {
         self.update_zero_and_negative_flags(self.register_y);
     }
 
+    /// Decrements the memory value.
+    /// If the value is 0, it will underflow into 0xff.
+    ///
+    /// Example
+    /// ```
+    /// ```
+    ///
     fn dec(&mut self, mode: &AddressingMode) {
         let addr = self.get_operand_address(mode);
-        let value = self.mem_read(addr);
+        let mut value = self.mem_read(addr);
 
         if value == 0 {
-            self.mem_write(addr, 0xff);
+            value = 0xff;
+            self.mem_write(addr, value);
         } else {
-            self.mem_write(addr, value - 1);
+            value = value - 1;
+            self.mem_write(addr, value);
         }
+
+        self.update_zero_and_negative_flags(value);
     }
 
+    /// Decrements the value of the x register.
+    /// If the value is 0, it will underflow into 0xff.
+    ///
+    /// Example
+    /// ```
+    /// ```
+    ///
     fn dex(&mut self) {
         if self.register_x == 0 {
             self.register_x = 0xff;
@@ -756,6 +1117,13 @@ impl CPU {
         self.update_zero_and_negative_flags(self.register_x);
     }
 
+    /// Decrements the value of the y register.
+    /// If the value is 0, it will underflow into 0xff.
+    ///
+    /// Example
+    /// ```
+    /// ```
+    ///
     fn dey(&mut self) {
         if self.register_y == 0 {
             self.register_y = 0xff;
@@ -766,14 +1134,31 @@ impl CPU {
     }
 
     fn asl(&mut self, mode: &AddressingMode) {
-        if self.register_a & 0b10000000 > 0 {
-            self.status.insert(CpuFlags::CARRY);
-        } else {
-            self.status.remove(CpuFlags::CARRY);
+        match mode {
+            AddressingMode::NoneAddressing => {
+                if self.register_a & 0b10000000 > 0 {
+                    self.status.insert(CpuFlags::CARRY);
+                } else {
+                    self.status.remove(CpuFlags::CARRY);
+                }
+
+                self.set_register_a(self.register_a << 1);
+            }
+            _ => {
+                let addr = self.get_operand_address(mode);
+                let mut value = self.mem_read(addr);
+
+                if value & 0b10000000 > 0 {
+                    self.status.insert(CpuFlags::CARRY);
+                } else {
+                    self.status.remove(CpuFlags::CARRY);
+                }
+
+                value = value << 1;
+                self.mem_write(addr, value);
+                self.update_zero_and_negative_flags(value);
+            }
         }
-
-        self.set_register_a(self.register_a << 1);
-
     }
     
     fn lsr(&mut self, mode: &AddressingMode) {
@@ -900,6 +1285,12 @@ impl CPU {
         self.status.insert(CpuFlags::DECIMAL);
     }
 
+    /// Updates the zero and negative CPU flags based on the provided result
+    ///
+    /// Example
+    /// ```
+    /// ```
+    ///
     fn update_zero_and_negative_flags(&mut self, result: u8) {
         if result == 0 {
             self.status.insert(CpuFlags::ZERO);
