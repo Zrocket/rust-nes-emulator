@@ -10,20 +10,26 @@ pub mod registers;
 pub struct NesPPU {
     /// Game visuals stored on cartridge
     pub chr_rom: Vec<u8>,
-    /// Internal memory to keep pallete tables used by a screen
-    pub palette_table: [u8; 32],
+    pub mirroring: Mirroring,
+    pub ctrl: ControlRegister,
+    pub mask: MaskRegister,
+    pub status: StatusRegister,
+    pub scroll: ScrollRegister,
+    pub addr: AddrRegister,
     /// 2 KiB of memory to hold background information
     pub vram: [u8; 2048],
+
     /// Sprite state memory
+    pub oam_addr: u8,
     pub oam_data: [u8; 256],
-
-    pub mirroring: Mirroring,
-
-    addr: AddrRegister,
-
-    pub ctrl: ControlRegister,
+    /// Internal memory to keep pallete tables used by a screen
+    pub palette_table: [u8; 32],
 
     internal_data_buf: u8,
+
+    scanline: u16,
+    cycles: usize,
+    pub nmi_interrupt: Option<u8>,
 }
 
 impl NesPPU {
@@ -31,13 +37,43 @@ impl NesPPU {
         NesPPU {
             chr_rom,
             mirroring,
+            ctrl: ControlRegister::new(),
+            mask: MaskRegister::new(),
+            status: StatusRegister::new(),
+            oam_addr: 0,
+            scroll: ScrollRegister::new(),
+            addr: AddrRegister::new(),
             vram: [0; 2048],
             oam_data: [0; 256],
             palette_table: [0; 32],
-            addr: AddrRegister::new(),
-            ctrl: ControlRegister::new(),
             internal_data_buf: 0,
+
+            cycles: 0,
+            scanline: 0,
+            nmi_interrupt: None,
         }
+    }
+
+    pub fn tick(&mut self, cycles: u8) -> bool {
+        self.cycles += cycles as usize;
+        if self.cycles >= 341 {
+            self.cycles = self.cycles - 341;
+            self.scanline += 1;
+
+            if self.scanline == 241 {
+                if self.ctrl.generate_vblank_nmi() {
+                    self.status.set_vblank_status(true);
+                    todo!("Should trigger NMI interrupt")
+                }
+            }
+
+            if self.scanline >= 262 {
+                self.scanline = 0;
+                self.status.reset_vblank_status();
+                return true;
+            }
+        }
+        return false;
     }
 
     pub fn write_to_ppu_addr(&mut self, value: u8) {
@@ -45,7 +81,11 @@ impl NesPPU {
     }
 
     pub fn write_to_ctrl(&mut self, value: u8) {
+        let before_nmi_status = self.ctrl.generate_vblank_nmi();
         self.ctrl.update(value);
+        if !before_nmi_status && self.ctrl.generate_vblank_nmi() && self.status.is_in_vblank() {
+            self.nmi_interrupt = Some(1);
+        }
     }
 
     fn increment_vram_addr(&mut self) {

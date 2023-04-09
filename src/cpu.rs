@@ -17,7 +17,7 @@ bitflags! {
         /// Decimal bit
         const DECIMAL           = 0b00001000;
         const BREAK             = 0b00010000;
-        const UNUSED            = 0b00100000;
+        const BREAK2            = 0b00100000;
         /// Overflow bit
         const OVERFLOW          = 0b01000000;
         /// Negative bit
@@ -348,6 +348,10 @@ impl CPU {
         let ref opcodes: HashMap<u8, &'static opcodes::OpCode> = *opcodes::OPCODES_MAP;
 
         loop {
+            if let Some(_nmi) = self.bus.poll_nmi_status() {
+                self.interrupt_nmi();
+            }
+
             callback(self);
 
             // get next OpCode
@@ -594,7 +598,7 @@ impl CPU {
                 0x40 => {
                     self.status.bits = self.stack_pop();
                     self.status.remove(CpuFlags::BREAK);
-                    self.status.insert(CpuFlags::UNUSED);
+                    self.status.insert(CpuFlags::BREAK2);
 
                     self.program_counter = self.stack_pop_u16();
                 }
@@ -630,7 +634,7 @@ impl CPU {
                 0x08 => {
                     let mut flags = self.status.clone();
                     flags.insert(CpuFlags::BREAK);
-                    flags.insert(CpuFlags::UNUSED);
+                    flags.insert(CpuFlags::BREAK2);
                     self.stack_push(flags.bits());
                 }
 
@@ -638,7 +642,7 @@ impl CPU {
                 0x28 => {
                     self.status.bits = self.stack_pop();
                     self.status.remove(CpuFlags::BREAK);
-                    self.status.insert(CpuFlags::UNUSED);
+                    self.status.insert(CpuFlags::BREAK2);
                 }
 
                 /* TAX */
@@ -809,6 +813,8 @@ impl CPU {
 
                 _ => todo!()
             }
+
+            self.bus.tick(opcode.cycles);
 
             if program_counter_state == self.program_counter {
                 self.program_counter += (opcode.len - 1) as u16;
@@ -1303,5 +1309,18 @@ impl CPU {
         } else {
             self.status.remove(CpuFlags::NEGATIVE);
         }
+    }
+
+    fn interrupt_nmi(&mut self) {
+        self.stack_push_u16(self.program_counter);
+        let mut flag = self.status.clone();
+        flag.insert(CpuFlags::BREAK);
+        flag.insert(CpuFlags::BREAK2);
+
+        self.stack_push(flag.bits);
+        self.status.insert(CpuFlags::INTERRUPT_DISABLE);
+
+        self.bus.tick(2);
+        self.program_counter = self.mem_read_u16(0xfffa);
     }
 }
