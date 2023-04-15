@@ -128,17 +128,17 @@ pub trait Mem {
 ///
 /// # [OPTIONAL: more explanations and code examples in case some specific
 /// # cases have to be explained in details]
-pub struct CPU {
+pub struct CPU<'a> {
     pub register_a: u8,
     pub register_x: u8,
     pub register_y: u8,
     pub status: CpuFlags,
     pub program_counter: u16,
     pub stack_pointer: u8,
-    pub bus: Bus,
+    pub bus: Bus<'a>,
 }
 
-impl Mem for CPU {
+impl Mem for CPU<'_> {
     fn mem_read(&mut self, addr: u16) -> u8 {
         self.bus.mem_read(addr)
     }
@@ -155,15 +155,18 @@ impl Mem for CPU {
         self.bus.mem_write_u16(pos, data);
     }
 }
+fn page_cross(addr1: u16, addr2: u16) -> bool {
+    addr1 & 0xFF00 != addr2 & 0xFF00
+}
 
-impl CPU {
+impl<'a> CPU<'a> {
     /// Creates a new CPU object with default parameters
     ///
     /// Example
     /// ```
     /// ```
     ///
-    pub fn new(bus: Bus) -> Self {
+    pub fn new<'b>(bus: Bus<'b>) -> CPU<'b> {
         CPU {
             register_a: 0,
             register_x: 0,
