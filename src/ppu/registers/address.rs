@@ -26,6 +26,7 @@ impl AddrRegister {
         if self.get() > 0x3fff { // mirror down addr above 0x3fff
             self.set(self.get() & 0b11111111111111);
         }
+
         self.hi_ptr = !self.hi_ptr;
     }
 
