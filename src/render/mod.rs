@@ -1,5 +1,6 @@
 pub mod frame;
 pub mod palette;
+pub mod sprite;
 
 use crate::{ppu::NesPPU, Mirroring};
 use frame::Frame;
@@ -22,6 +23,12 @@ impl Rect {
     }
 }
 
+/// [short explanation of what the item does]
+///
+/// Example
+/// ```
+/// ```
+///
 fn render_name_table(ppu: &NesPPU, frame: &mut Frame, name_table: &[u8],
                      view_port: Rect, shift_x: isize, shift_y: isize) {
     let bank = ppu.ctrl.bknd_pattern_addr();
@@ -31,18 +38,23 @@ fn render_name_table(ppu: &NesPPU, frame: &mut Frame, name_table: &[u8],
     for i in 0..0x3c0 {
         let tile_column = i % 32;
         let tile_row = i / 32;
-        let tile_idx = name_table[i] as u16;
-        let tile = &ppu.chr_rom[(bank + tile_idx * 16) as usize..=(bank + tile_idx * 16 + 15) as usize];
+        let tile_idx = name_table[i] as u16; let tile = &ppu.chr_rom[(bank + tile_idx * 16) as usize..=(bank + tile_idx * 16 + 15) as usize];
         let palette = bg_palette(ppu, attribute_table, tile_column, tile_row);
 
+        // for each row of pixels
         for y in 0..=7 {
+            // get 8 byte seperated row of two bit pixel values
             let mut upper = tile[y];
             let mut lower = tile[y + 8];
 
+            // for each row collumn
             for x in (0..=7).rev() {
+                // get the two byte pixel value
                 let value = (1 & lower) << 1 | (1 & upper);
+                // shift remaining pixel values down
                 upper = upper >> 1;
                 lower = lower >> 1;
+                // match value with palette color
                 let rgb = match value {
                     0 => palette::SYSTEM_PALLETE[ppu.palette_table[0] as usize],
                     1 => palette::SYSTEM_PALLETE[palette[1] as usize],
@@ -50,6 +62,7 @@ fn render_name_table(ppu: &NesPPU, frame: &mut Frame, name_table: &[u8],
                     3 => palette::SYSTEM_PALLETE[palette[3] as usize],
                     _ => panic!("can't be"),
                 };
+                // get pixel coordinates
                 let pixel_x = tile_column * 8 + x;
                 let pixel_y = tile_row * 8 + y;
 
@@ -61,6 +74,12 @@ fn render_name_table(ppu: &NesPPU, frame: &mut Frame, name_table: &[u8],
     }
 }
 
+/// [short explanation of what the item does]
+///
+/// Example
+/// ```
+/// ```
+///
 fn bg_palette(ppu: &NesPPU, attribute_table: &[u8], tile_column: usize, tile_row: usize) -> [u8; 4] {
     let attr_table_idx = tile_row / 4 * 8 + tile_column / 4;
     let attr_byte = attribute_table[attr_table_idx];
@@ -82,6 +101,12 @@ fn bg_palette(ppu: &NesPPU, attribute_table: &[u8], tile_column: usize, tile_row
     ]
 }
 
+/// [short explanation of what the item does]
+///
+/// Example
+/// ```
+/// ```
+///
 fn sprite_palette(ppu: &NesPPU, palette_idx: u8) -> [u8; 4] {
     let start = 0x11 + (palette_idx * 4) as usize;
     [
@@ -92,6 +117,12 @@ fn sprite_palette(ppu: &NesPPU, palette_idx: u8) -> [u8; 4] {
     ]
 }
 
+/// [short explanation of what the item does]
+///
+/// Example
+/// ```
+/// ```
+///
 pub fn render(ppu: &NesPPU, frame: &mut Frame) {
     let scroll_x = (ppu.scroll.scroll_x) as usize;
     let scroll_y = (ppu.scroll.scroll_y) as usize;
@@ -127,10 +158,13 @@ pub fn render(ppu: &NesPPU, frame: &mut Frame) {
                           );
     }
 
+    // for each tile
     for i in (0..ppu.oam_data.len()).step_by(4).rev() {
         let tile_idx = ppu.oam_data[i + 1] as u16;
         let tile_x = ppu.oam_data[i + 3] as usize;
         let tile_y = ppu.oam_data[i] as usize;
+
+        let priority = ppu.oam_data[i + 2] >> 5 & 1;
 
         let flip_vertical = if ppu.oam_data[i + 2] >> 7 & 1 == 1 {
             true
@@ -148,13 +182,30 @@ pub fn render(ppu: &NesPPU, frame: &mut Frame) {
 
         let tile = &ppu.chr_rom[(bank + tile_idx * 16) as usize..=(bank + tile_idx * 16 + 15) as usize];
 
+        // for each row of pixels
         for y in 0..=7 {
+            // get 8 byte seperated row of two bit pixel values
             let mut upper = tile[y];
             let mut lower = tile[y + 8];
+            // for each row collumn
             'ololo: for x in (0..=7).rev() {
+                let (real_x, real_y) =  match(flip_horizpntal, flip_vertical) {
+                    (false, false) => (tile_x + x, tile_y + y),
+                    (true, false) => (tile_x + 7 - x, tile_y + y),
+                    (false, true) => (tile_x + x, tile_y + 7 - y),
+                    (true, true) => (tile_x + 7 - x, tile_y + 7 - y),
+                };
+
+                if priority == 1 && (frame.get_pixel(real_x, real_y) != palette::SYSTEM_PALLETE[ppu.palette_table[0] as usize] || frame.get_pixel(real_x, real_y) == (0,0,0)) {
+                    continue 'ololo;
+                }
+
+                // get the two byte pixel value
                 let value = (1 & lower) << 1 | (1 & upper);
+                // shift remaining pixel values down
                 upper = upper >> 1;
                 lower = lower >> 1;
+                // get color for two bit pixel value
                 let rgb = match value {
                     0 => continue 'ololo,
                     1 => palette::SYSTEM_PALLETE[sprite_palette[1] as usize],
@@ -162,12 +213,8 @@ pub fn render(ppu: &NesPPU, frame: &mut Frame) {
                     3 => palette::SYSTEM_PALLETE[sprite_palette[3] as usize],
                     _ => panic!("can't be"),
                 };
-                match (flip_horizpntal, flip_vertical) {
-                    (false, false) => frame.set_pixel(tile_x + x, tile_y + y, rgb),
-                    (true, false) => frame.set_pixel(tile_x + 7 - x, tile_y + y, rgb),
-                    (false, true) => frame.set_pixel(tile_x + x, tile_y + 7 - y, rgb),
-                    (true, true) => frame.set_pixel(tile_x + 7 - x, tile_y + 7 - y, rgb),
-                }
+
+                frame.set_pixel(real_x, real_y, rgb);
             }
         }
     }

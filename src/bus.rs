@@ -47,10 +47,13 @@ pub struct Bus<'call> {
     cpu_vram: [u8; 2048],
     /// Stored program rom
     prg_rom: Vec<u8>,
+    /// PPU
     ppu: NesPPU,
-
+    /// Cycles
     cycles: usize,
+    /// Callback function
     gameloop_callback: Box<dyn FnMut(&NesPPU, &mut Joypad) + 'call>,
+    /// Joypad 1
     joypad: Joypad,
 }
 
@@ -77,6 +80,12 @@ impl<'a> Bus<'a> {
         }
     }
 
+    /// Read the program rom at addr
+    ///
+    /// Example
+    /// ```
+    /// ```
+    ///
     fn read_prg_rom(&self, mut addr: u16) -> u8 {
         addr -= 0x8000;
         if self.prg_rom.len() == 0x4000 && addr >= 0x4000 {
@@ -86,11 +95,19 @@ impl<'a> Bus<'a> {
         self.prg_rom[addr as usize]
     }
 
+    /// Execute a designated ammount of clock cycles
+    ///
+    /// Example
+    /// ```
+    /// ```
+    ///
     pub fn tick(&mut self, cycles: u8) {
+        // add to current cycles
         self.cycles += cycles as usize;
 
         let nmi_before = self.ppu.nmi_interrupt.is_some();
-        self.ppu.tick(cycles *3);
+        // execute ppu clock cycles
+        self.ppu.tick(cycles * 3);
         let nmi_after = self.ppu.nmi_interrupt.is_some();
 
         if !nmi_before && nmi_after {
@@ -98,12 +115,24 @@ impl<'a> Bus<'a> {
         }
     }
 
+    /// Return the current status of ppu nmi interrupt
+    ///
+    /// Example
+    /// ```
+    /// ```
+    ///
     pub fn poll_nmi_status(&mut self) -> Option<u8> {
         self.ppu.poll_nmi_interrupt()
     }
 }
 
 impl Mem for Bus<'_> {
+    /// Read data from memory location addr
+    ///
+    /// Example
+    /// ```
+    /// ```
+    ///
     fn mem_read(&mut self, addr: u16) -> u8 {
         match addr {
             RAM..= RAM_MIRRORS_END => {
@@ -144,6 +173,12 @@ impl Mem for Bus<'_> {
         }
     }
 
+    /// Write data to the memory location addr
+    ///
+    /// Example
+    /// ```
+    /// ```
+    ///
     fn mem_write(&mut self, addr: u16, data: u8) {
         match addr {
             RAM..=RAM_MIRRORS_END => {

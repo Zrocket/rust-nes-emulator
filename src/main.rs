@@ -32,7 +32,7 @@ fn main() {
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
     let window = video_subsystem
-        .window("Tile viewer", (256.0 * 4.0) as u32, (240.0 * 2.0) as u32)
+        .window("Tile viewer", (256.0 * 3.0) as u32, (240.0 * 3.0) as u32)
         .position_centered()
         .build()
         .unwrap();
@@ -43,7 +43,7 @@ fn main() {
 
     let creator = canvas.texture_creator();
     let mut texture = creator
-        .create_texture_target(PixelFormatEnum::RGB24, 256 * 2, 240)
+        .create_texture_target(PixelFormatEnum::RGB24, 256, 240)
         .unwrap();
 
     // load the game
@@ -64,7 +64,7 @@ fn main() {
 
     let bus = Bus::new(rom, move |ppu: &NesPPU, joypad: &mut Joypad| {
         render::render(ppu, &mut frame);
-        texture.update(None, &frame.data, 256 *2 * 3).unwrap();
+        texture.update(None, &frame.data, 256 * 2 * 3).unwrap();
 
         canvas.copy(&texture, None, None).unwrap();
 
