@@ -17,6 +17,7 @@ pub mod trace;
 pub mod ppu;
 pub mod render;
 pub mod joypad;
+pub mod apu;
 
 pub use opcodes::*;
 pub use cpu::*;
@@ -26,6 +27,7 @@ pub use trace::*;
 pub use ppu::*;
 pub use render::*;
 pub use joypad::*;
+pub use apu::*;
 
 fn main() {
     //init sdl2

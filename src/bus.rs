@@ -3,6 +3,7 @@ use super::Rom;
 use super::NesPPU;
 use super::PPU;
 use super::Joypad;
+use super::APU;
 
 //  _______________ $10000  _______________
 // | PRG-ROM       |       |               |
@@ -147,7 +148,32 @@ impl Mem for Bus<'_> {
             0x2004 => self.ppu.read_oam_data(),
             0x2007 => self.ppu.read_data(),
 
-            0x4000..=0x4015 => {
+            0x4000..=0x4003 => {
+                // Ignore APU
+                0
+            }
+
+            0x4004..=0x4007 => {
+                // Ignore APU
+                0
+            }
+
+            0x4008..=0x400B => {
+                // Ignore APU
+                0
+            }
+
+            0x400C..=0x400F => {
+                // Ignore APU
+                0
+            }
+            
+            0x4010..=0x4013 => {
+                // Ignore APU
+                0
+            }
+
+            0x4015 => {
                 // Ignore APU
                 0
             }
